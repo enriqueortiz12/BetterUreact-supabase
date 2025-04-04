@@ -1,17 +1,9 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
-const { width } = Dimensions.get('window');
-
-const AuthButton = ({ onPress, title }) => {
+const AuthButton = ({ title, onPress }) => {
   return (
-    <TouchableOpacity
-      style={styles.button}
-      onPress={() => {
-        console.log('✅ BUTTON PRESSED:', title); // Force console log
-        onPress(); // Make sure function runs
-      }}
-    >
+    <TouchableOpacity style={styles.button} onPress={onPress}>
       <Text style={styles.buttonText}>{title}</Text>
     </TouchableOpacity>
   );
@@ -19,16 +11,14 @@ const AuthButton = ({ onPress, title }) => {
 
 const styles = StyleSheet.create({
   button: {
-    width: Math.min(width * 0.9, 400),
-    height: 55,
-    borderRadius: 15,
-    backgroundColor: '#00FFFF',
-    justifyContent: 'center',
+    backgroundColor: '#00bfff',
+    padding: 15,
+    borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 15,
+    marginVertical: 10,
   },
   buttonText: {
-    color: '#000000',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },

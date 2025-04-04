@@ -1,228 +1,172 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { supabase } from '../utils/supabaseClient';
 
-const AuthScreen = () => {
-  const navigation = useNavigation();
-
-  // State for sign-up and login
+export default function AuthScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [fitnessGoal, setFitnessGoal] = useState('');
-  const [gender, setGender] = useState('');
-  const [height, setHeight] = useState('');  // Added height input
+  const [isLogin, setIsLogin] = useState(true);
 
-  const [isLogin, setIsLogin] = useState(true); // Toggle between login and signup
+  const handleAuth = async () => {
+    if (!email || !password) return Alert.alert('Please fill all fields');
 
-  const handleLogin = async () => {
-    try {
-      const { user, error } = await supabase.auth.signIn({
+    if (!isLogin && password !== confirmPassword) {
+      return Alert.alert('Passwords do not match');
+    }
+
+    if (isLogin) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return Alert.alert('Login error', error.message);
+
+      navigation.navigate('HomeScreen', { user: data.user });
+    } else {
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: { emailRedirectTo: 'https://yourapp.com/welcome' },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          return Alert.alert('This email already exists.');
+        }
+        return Alert.alert('Signup error', error.message);
+      }
 
-      console.log('Login successful:', user);
-      navigation.navigate('HomeScreen', { user }); // Pass user to HomeScreen
-    } catch (error) {
-      console.error('Login error:', error.message);
-      Alert.alert('Error', error.message);
+      navigation.navigate('ProfileInfoForm', { user: data.user });
     }
   };
 
-  const handleSignUp = async () => {
-  if (password !== confirmPassword) {
-    return Alert.alert('Passwords do not match');
-  }
-
-  try {
-    // Step 1: Check if the email is already used in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
+  const handleResetPassword = async () => {
+    if (!email) return Alert.alert('Please enter your email address.');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://yourapp.com/reset-password',
     });
+    if (error) return Alert.alert('Error', error.message);
+    Alert.alert('Check your email to reset your password.');
+  };
 
-    if (authError) {
-      console.log('Auth Error:', authError);
-      // If there's an error related to email already being used in Supabase Auth, show an error message
-      if (authError.message.includes('duplicate key value violates unique constraint')) {
-        return Alert.alert('Email already exists', 'This email is already associated with an account.');
-      }
-      throw authError; // Handle other errors from Supabase Auth
-    }
-
-    console.log('User signed up successfully in Auth:', authData);
-
-    // Step 2: Check if the email already exists in the profiles table
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('email', email)
-      .single(); // Look for a single profile with the given email
-
-    if (profileData) {
-      console.log('Profile already exists in profiles table:', profileData);
-      // If email is found in the profiles table, show an error message and prevent navigation
-      return Alert.alert('Email already exists', 'This email is already associated with a profile.');
-    }
-
-    // Step 3: Insert the profile data into the profiles table
-    const { error: profileInsertError } = await supabase.from('profiles').insert([
-      {
-        id: authData.id, // Use the user ID from the Supabase Auth response
-        full_name: fullName,
-        email: authData.email,
-        fitness_goal: fitnessGoal,
-        gender: gender,
-        height: height,
-      },
-    ]);
-
-    if (profileInsertError) {
-      console.log('Profile Insert Error:', profileInsertError);
-      throw new Error(profileInsertError.message); // Handle errors when inserting profile
-    }
-
-    console.log('Profile data inserted successfully:', authData);
-
-    // Step 4: After successful sign-up and profile creation, navigate to ProfileInfoScreen
-    navigation.navigate('ProfileInfoScreen', { user: authData });
-
-  } catch (error) {
-    console.error('Sign-Up error:', error.message);
-    Alert.alert('Error', error.message); // Show any errors that occur during the process
-  }
-};
+  const handleResendVerification = async () => {
+    if (!email) return Alert.alert('Please enter your email address.');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { redirectTo: 'https://yourapp.com/welcome' },
+    });
+    if (error) return Alert.alert('Error', error.message);
+    Alert.alert('Verification email sent.');
+  };
 
   return (
     <View style={styles.container}>
-      {isLogin ? (
-        <>
-          <Text style={styles.header}>Login to BetterU</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-          <Button title="Login" onPress={handleLogin} color="#00FFFF" />
+      <Text style={styles.title}>{isLogin ? 'Login to BetterU' : 'Create an Account'}</Text>
 
-          <Text style={styles.switchText}>
-            Don't have an account?{' '}
-            <Text
-              style={styles.switchButton}
-              onPress={() => setIsLogin(false)}
-            >
-              Sign Up
-            </Text>
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text style={styles.header}>Create an Account</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            value={fullName}
-            onChangeText={setFullName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Fitness Goal"
-            value={fitnessGoal}
-            onChangeText={setFitnessGoal}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Gender"
-            value={gender}
-            onChangeText={setGender}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Height"
-            value={height}
-            onChangeText={setHeight}
-          />
-          <Button title="Sign Up" onPress={handleSignUp} color="#00FFFF" />
+      <TextInput
+        placeholder="Email"
+        placeholderTextColor="#aaa"
+        value={email}
+        onChangeText={setEmail}
+        style={styles.input}
+      />
+      <TextInput
+        placeholder="Password"
+        placeholderTextColor="#aaa"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+        style={styles.input}
+      />
+      {!isLogin && (
+        <TextInput
+          placeholder="Confirm Password"
+          placeholderTextColor="#aaa"
+          secureTextEntry
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          style={styles.input}
+        />
+      )}
 
-          <Text style={styles.switchText}>
-            Already have an account?{' '}
-            <Text
-              style={styles.switchButton}
-              onPress={() => setIsLogin(true)}
-            >
-              Log In
-            </Text>
-          </Text>
+      <TouchableOpacity style={styles.button} onPress={handleAuth}>
+        <Text style={styles.buttonText}>{isLogin ? 'Login' : 'Sign Up'}</Text>
+      </TouchableOpacity>
+
+      {isLogin && (
+        <>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleResetPassword}>
+            <Text style={styles.secondaryButtonText}>Forgot Password?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleResendVerification}>
+            <Text style={styles.secondaryButtonText}>Resend Verification Email</Text>
+          </TouchableOpacity>
         </>
       )}
+
+      <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+        <Text style={styles.linkText}>
+          {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Login'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#000',
+    paddingHorizontal: 24,
     justifyContent: 'center',
-    padding: 20,
   },
-  header: {
-    fontSize: 24,
-    color: 'white',
-    marginBottom: 20,
+  title: {
+    fontSize: 28,
+    color: '#00FFFF',
+    fontWeight: '700',  // Bold title
+    marginBottom: 30,
     textAlign: 'center',
+    fontFamily: 'Roboto', // A better font-family
   },
   input: {
-    backgroundColor: '#fff',
-    padding: 10,
-    marginBottom: 20,
-    borderRadius: 8,
+    backgroundColor: '#222',
+    color: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
     fontSize: 16,
+    fontFamily: 'Roboto',
   },
-  switchText: {
-    color: 'white',
+  button: {
+    backgroundColor: '#00FFFF',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  buttonText: {
+    color: '#000',
     textAlign: 'center',
-    marginTop: 20,
-  },
-  switchButton: {
-    color: '#00FFFF',
     fontWeight: 'bold',
+    fontSize: 18,  // Make the button text larger for better visibility
+  },
+  linkText: {
+    marginTop: 20,
+    color: '#00FFFF',
+    textAlign: 'center',
+    fontSize: 16,
+    fontFamily: 'Roboto',
+  },
+  secondaryButton: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#1e1e1e',
+    borderColor: '#00FFFF',
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
+    color: '#00FFFF',
+    textAlign: 'center',
+    fontSize: 16,
+    fontFamily: 'Roboto',
   },
 });
-
-export default AuthScreen;
